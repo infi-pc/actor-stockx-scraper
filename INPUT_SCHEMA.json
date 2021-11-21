@@ -1,0 +1,27 @@
+{
+  "title": "StockX scraper",
+  "description": "Scrapes StockX",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "startUrls": {
+      "title": "Start URLs",
+      "type": "array",
+      "description": "URLs to start with",
+      "editor": "requestListSources",
+      "prefill": [
+        { "url": "https://stockx.com/nike-zoom-fly-3-premium-neptune-green-midnight-turquoise" }
+      ]
+    },
+    "codes": {
+      "title": "Product codes",
+      "type": "array",
+      "description": "URLs to start with",
+      "editor": "stringList",
+      "prefill": [
+        "BQ8928-700"
+      ]
+    }
+  },
+  "required": []
+}
