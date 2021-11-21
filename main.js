@@ -2,7 +2,7 @@ const Apify = require('apify');
 const { utils: { log } } = Apify;
 
 Apify.main(async () => {
-  const { startUrls, codes } = await Apify.getInput();
+  const { startUrls = [], codes = [] } = await Apify.getInput();
 
   const requestList = await Apify.openRequestList('start-urls', startUrls);
   const requestQueue = await Apify.openRequestQueue();
