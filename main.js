@@ -34,7 +34,10 @@ Apify.main(async () => {
     // proxyConfiguration, // TODO: Enable on platform
     launchContext: {
       useChrome: true,
-      stealth: true,
+      // stealth: true, // sounds nice, doesn't work ¯\_(ツ)_/¯
+      stealthOptions: {
+        hideWebDriver: true, // this should work according to https://discord.com/channels/801163717915574323/801163920299393034/903107007148601346
+      }
     },
     handlePageFunction: async (context) => {
       const { url, userData: { type } } = context.request;
