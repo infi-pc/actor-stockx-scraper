@@ -6,8 +6,18 @@ Apify.main(async () => {
   const {
     startUrls = [],
     codes = [],
-    liveView = false
-  } = await Apify.getInput();
+  } = await Apify.getInput() ?? {
+    startUrls: [
+      // 'https://stockx.com/nike-zoom-fly-3-white-multi-color',
+      // 'https://stockx.com/vans-era-horror-pack-it-pennywise',
+      // 'https://stockx.com/adidas-top-ten-hi-jasmine-jones-pd'
+    ],
+    codes: [
+      'AT8240-103',
+      'VN0A4U39ZPM',
+      'FW8978'
+    ],
+  };
 
   const requestList = await Apify.openRequestList('start-urls', startUrls);
   const requestQueue = await Apify.openRequestQueue();
@@ -47,8 +57,35 @@ Apify.main(async () => {
       useChrome: true, // full Google Chrome rather than the bundled Chromium
     },
     handlePageFunction: async (context) => {
-      const { url, userData: { type } } = context.request;
+      const { request, response, page, session } = context;
+      const { url, userData: { type } } = request;
       log.info('Page opened.', { type, url });
+
+      // Handle blocking
+      switch (response.status()) {
+        case 404:
+          log.info('404 » skipping', { url });
+          return;
+        case 403: // FIXME: This is already handled by the PlaywrightCrawler
+          log.info('403 (blocked) » retiring session and aborting', { url });
+          session.retire();
+          throw '403' // Not throwing error, no need for call-stack
+        case 200:
+          const captcha = await page.$("[class*='captcha']");
+          if (captcha) {
+            log.info('200 (ok), but captcha detected » retiring session and aborting', { url });
+            throw 'captcha' // Not throwing error, no need for call-stack
+          } else {
+            log.info('200 (ok) » continuing', { url });
+          }
+          break;
+        default:
+          log.info('Unhandled status » retiring session and aborting', { url, status: response.status() });
+          session.retire();
+          throw 'Unhandled status' // Not throwing error, no need for call-stack
+      }
+
+      // Process
       switch (type) {
         case 'LIST': // https://stockx.com/nike // TODO
           return handleList(context);
