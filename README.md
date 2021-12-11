@@ -2,6 +2,12 @@
 
 MVP, yolo!
 
+## Development
+
+```
+apify push && apify call
+```
+
 TODOs
 - [ ] Consider cheerio
 - [ ] Add docs

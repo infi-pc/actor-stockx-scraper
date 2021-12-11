@@ -1,8 +1,13 @@
 const Apify = require('apify');
+const playwright = require('playwright');
 const { utils: { log } } = Apify;
 
 Apify.main(async () => {
-  const { startUrls = [], codes = [] } = await Apify.getInput();
+  const {
+    startUrls = [],
+    codes = [],
+    liveView = false
+  } = await Apify.getInput();
 
   const requestList = await Apify.openRequestList('start-urls', startUrls);
   const requestQueue = await Apify.openRequestQueue();
@@ -26,18 +31,20 @@ Apify.main(async () => {
     }
   }
 
-  // const proxyConfiguration = await Apify.createProxyConfiguration();
+  const proxyConfiguration = await Apify.createProxyConfiguration();
 
-  const crawler = new Apify.PuppeteerCrawler({
+  // Tried Puppeteer at first, but
+  // `stealth: true` is not working https://discord.com/channels/801163717915574323/801163920299393034/903107007148601346
+  // so I've tried `stealthOptions.hideWebDriver = true`, but also did not work
+  // so I've tried PlaywrightCrawler as recommended https://discord.com/channels/801163717915574323/801163920299393034/903114071086342185
+  const crawler = new Apify.PlaywrightCrawler({
+    maxRequestRetries: 5, //
+    maxConcurrency: 1, // to make debugging easier
     requestList,
     requestQueue,
-    // proxyConfiguration, // TODO: Enable on platform
+    proxyConfiguration, // TODO: Enable on platform
     launchContext: {
-      useChrome: true,
-      // stealth: true, // sounds nice, doesn't work ¯\_(ツ)_/¯
-      stealthOptions: {
-        hideWebDriver: true, // this should work according to https://discord.com/channels/801163717915574323/801163920299393034/903107007148601346
-      }
+      useChrome: true, // full Google Chrome rather than the bundled Chromium
     },
     handlePageFunction: async (context) => {
       const { url, userData: { type } } = context.request;
