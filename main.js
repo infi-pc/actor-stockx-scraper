@@ -41,13 +41,16 @@ Apify.main(async () => {
     }
   }
 
-  const proxyConfiguration = await Apify.createProxyConfiguration();
+  const proxyConfiguration = await Apify.createProxyConfiguration({
+    groups: ["RESIDENTIAL"]
+  });
 
   // Tried Puppeteer at first, but
   // `stealth: true` is not working https://discord.com/channels/801163717915574323/801163920299393034/903107007148601346
   // so I've tried `stealthOptions.hideWebDriver = true`, but also did not work
   // so I've tried PlaywrightCrawler as recommended https://discord.com/channels/801163717915574323/801163920299393034/903114071086342185
   const crawler = new Apify.PlaywrightCrawler({
+
     maxRequestRetries: 5, //
     maxConcurrency: 1, // to make debugging easier
     requestList,
@@ -55,7 +58,9 @@ Apify.main(async () => {
     proxyConfiguration, // TODO: Enable on platform
     launchContext: {
       useChrome: true, // full Google Chrome rather than the bundled Chromium
+      // launcher: require("playwright").firefox,
     },
+    navigationTimeoutSecs: 3 * 60,
     handlePageFunction: async (context) => {
       const { request, response, page, session } = context;
       const { url, userData: { type } } = request;
