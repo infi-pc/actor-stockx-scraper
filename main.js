@@ -146,7 +146,7 @@ async function handleDetail({ request, page }) {
       
       return foundPid
     });
-    log.info("found pid: ", pid)
+    log.info("found pid: "+ pid)
     const image = await page.$$eval('meta[property="image"]', (els) => {
       if (els.length === 0) {
         return null
@@ -156,7 +156,7 @@ async function handleDetail({ request, page }) {
       
       return foundImage.content
     });
-    log.info("found image: ", image)
+    log.info("found image: "+ image)
     const data = await page.$$eval('script[type="application/ld+json"]', (scriptEls) => {
       const productJsonLdEl = scriptEls.find(x => {
         const parsed = JSON.parse(x.textContent);
