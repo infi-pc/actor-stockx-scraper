@@ -8,14 +8,13 @@ Apify.main(async () => {
     codes = [],
   } = await Apify.getInput() ?? {
     startUrls: [
-      // 'https://stockx.com/nike-zoom-fly-3-white-multi-color',
-      // 'https://stockx.com/vans-era-horror-pack-it-pennywise',
-      // 'https://stockx.com/adidas-top-ten-hi-jasmine-jones-pd'
+      // "https://stockx.com/futura-2000-fl-006-figure",
+      'https://stockx.com/air-jordan-max-aura-black',
     ],
     codes: [
-      'AT8240-103',
-      'VN0A4U39ZPM',
-      'FW8978'
+      // 'AT8240-103',
+      // 'VN0A4U39ZPM',
+      // 'FW8978'
     ],
   };
 
@@ -135,6 +134,29 @@ async function handleCode({ request, page }, requestQueue, codesMapKVStore) {
 
 async function handleDetail({ request, page }) {
   try {
+    const pid = await page.$$eval('head title', (els) => {
+      if (els.length > 1) {
+        console.error("too many titles")
+      }
+      if (els.length === 0) {
+        throw new Error("no title")
+      }
+      const foundTitle = els[0]
+      const foundPid = foundTitle.textContent.match(/[^ ]+$/)[0]
+      
+      return foundPid
+    });
+    log.info("found pid: ", pid)
+    const image = await page.$$eval('meta[property="image"]', (els) => {
+      if (els.length === 0) {
+        return null
+      }
+      const foundImage = els[0]
+      
+      
+      return foundImage.content
+    });
+    log.info("found image: ", image)
     const data = await page.$$eval('script[type="application/ld+json"]', (scriptEls) => {
       const productJsonLdEl = scriptEls.find(x => {
         const parsed = JSON.parse(x.textContent);
@@ -143,10 +165,13 @@ async function handleDetail({ request, page }) {
       const productJsonLdText = productJsonLdEl.textContent;
       return JSON.parse(productJsonLdText);
     });
+    log.info("found found data, pushing")
     await Apify.pushData({
       '#success': true,
       url: request.url,
       data, // TODO: Remove internal @ props
+      pid,
+      image,
     });
   } catch (err) {
     await Apify.pushData({
