@@ -18,7 +18,13 @@ Apify.main(async () => {
     ],
   };
 
-  const requestList = await Apify.openRequestList("start-urls", startUrls);
+  const requestList = await Apify.openRequestList(
+    "start-urls",
+    startUrls.map((url) => {
+      return { url, userData: { type: "DETAIL" } };
+    })
+  );
+
   const requestQueue = await Apify.openRequestQueue();
   const codesMapKVStore = await Apify.openKeyValueStore("STOCKX-CODES-MAP");
 
@@ -84,7 +90,7 @@ Apify.main(async () => {
         url,
         userData: { type },
       } = request;
-      log.info("Page opened.", { type, url });
+      log.info("Page opened: ", { type, url });
 
       // Handle blocking
       switch (response.status()) {
@@ -116,6 +122,7 @@ Apify.main(async () => {
           throw "Unhandled status"; // Not throwing error, no need for call-stack
       }
 
+      log.info("Handling request", { url, type: type || "no type" });
       // Process
       switch (type) {
         case "LIST": // https://stockx.com/nike // TODO
@@ -204,18 +211,26 @@ async function handleDetail({ request, page }) {
 
     try {
       try {
+        await page.click(`[aria-label="Close"]`, { timeout: 5000 });
+      } catch (err) {
+        log.info("Modal to click not found: " + String(err));
+      }
+      try {
         await page.click(`[aria-label="close"]`, { timeout: 5000 });
       } catch (err) {
-        log.info("Modal to click not found: ", String(err));
+        log.info("Modal to click not found: " + String(err));
       }
+ 
+
 
       await page.click("text=View Sales");
-      await page.waitForSelector('[data-component="ViewMarketActivity"]');
+      await page.waitForSelector('[data-component="ViewMarketActivity"] tbody');
 
       sales = await page.$$eval(
         '[data-component="ViewMarketActivity"] tbody',
         (tbody) => {
           const data = [];
+          console.log({tbody})
           for (const x of tbody.children) {
             const date = x.children[0].innerText;
             const time = x.children[1].innerText;
@@ -233,10 +248,8 @@ async function handleDetail({ request, page }) {
       );
     } catch (err) {
       console.error(err);
-      log.info("View sales error: ", String(err));
+      log.info("View sales error: " + String(err));
     }
-
-    console.log("SALES: ", sales);
 
     const dataToWrite = {
       "#success": true,
@@ -247,7 +260,7 @@ async function handleDetail({ request, page }) {
       image,
     };
 
-    await fs.writeFile("./data.json", JSON.stringify(dataToWrite));
+    // await fs.writeFile("./data.json", JSON.stringify(dataToWrite));
 
     await Apify.pushData(dataToWrite);
   } catch (err) {
