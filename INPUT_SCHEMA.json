@@ -4,13 +4,13 @@
   "type": "object",
   "schemaVersion": 1,
   "properties": {
-    "startUrls": {
-      "title": "Start URLs",
+    "slugs": {
+      "title": "Start Slugs",
       "type": "array",
-      "description": "URLs to start with",
-      "editor": "requestListSources",
+      "description": "Slug to start with",
+      "editor": "stringList",
       "prefill": [
-        { "url": "https://stockx.com/nike-zoom-fly-3-premium-neptune-green-midnight-turquoise" }
+        "nike-zoom-fly-3-premium-neptune-green-midnight-turquoise"
       ]
     },
     "codes": {

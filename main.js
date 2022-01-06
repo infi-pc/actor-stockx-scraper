@@ -1,141 +1,162 @@
 const Apify = require("apify");
 const fs = require("fs/promises");
 const playwright = require("playwright");
-const { handleCode } = require("./handleCode");
-const { handleDetail } = require("./handleDetail");
 const {
   utils: { log },
 } = Apify;
 
 Apify.main(async () => {
-  const { startUrls = [], codes = [] } = (await Apify.getInput()) ?? {
-    startUrls: [
-      // "https://stockx.com/futura-2000-fl-006-figure",
-      "https://stockx.com/air-jordan-max-aura-black",
+  const { slugs = [], codes = [] } = (await Apify.getInput()) ?? {
+    slugs: [
+      // "air-jordan-max-aura-black"
     ],
     codes: [
-      // 'AT8240-103',
+      "AT8240-103",
       // 'VN0A4U39ZPM',
       // 'FW8978'
     ],
   };
 
+  console.log(`slugs: ${slugs}`);
+
   const requestList = await Apify.openRequestList(
-    "start-urls",
-    startUrls.map((url) => {
-      return { url, userData: { type: "DETAIL" } };
+    "slugs",
+    slugs.map((slug) => {
+      return { url: makeDetailUrl(slug), userData: { type: "DETAIL" } };
     })
   );
 
   const requestQueue = await Apify.openRequestQueue();
-  const codesMapKVStore = await Apify.openKeyValueStore("STOCKX-CODES-MAP");
+  const codesMapKVStore = await Apify.openKeyValueStore(
+    "STOCKX-CODES-TO-SLUG-MAP"
+  );
 
   // load cachedUrl LUT code -> url
   for (const code of codes) {
     // `CT8013-170`
-    const cachedUrl = await codesMapKVStore.getValue(code);
-    if (cachedUrl) {
+    const cachedSlug = await codesMapKVStore.getValue(code);
+    if (cachedSlug) {
       log.info(
-        `Code ${code} already exists in the store, reusing with url ${cachedUrl}`
+        `Code ${code} already exists in the store, reusing with url ${cachedSlug}`
       );
+
       await requestQueue.addRequest({
-        url: cachedUrl,
+        url: makeDetailUrl(cachedSlug),
         userData: { type: "DETAIL" },
       });
     } else {
       log.info(`Code ${code} not found in the store, adding`);
+      const url =
+        "https://xw7sbct9v6-1.algolianet.com/1/indexes/products/query?x-algolia-agent=Algolia%20for%20vanilla%20JavaScript%203.32.1&x-algolia-application-id=XW7SBCT9V6&x-algolia-api-key=6b5e76b49705eb9f51a06d3c82f7acee";
+      const headers = {
+        // 'user-agent': userAgent,
+        "sec-fetch-dest": "none",
+        accept: "*/*",
+        "sec-fetch-site": "cross-site",
+        "sec-fetch-mode": "cors",
+        "accept-language": "en-US",
+      };
+
+      const body = JSON.stringify({
+        params: `query=${code}&facets=*&filters=&hitsPerPage=10`,
+      });
+      const method = "POST";
       await requestQueue.addRequest({
-        url: `https://stockx.com/search?s=${code}`,
-        userData: { type: "CODE", code },
+        url,
+        userData: { type: "CODE", code, headers, body, method },
       });
     }
   }
 
-  const proxyConfiguration = await Apify.createProxyConfiguration({
-    groups: ["RESIDENTIAL"],
-  });
+  // const proxyConfiguration = await Apify.createProxyConfiguration({
+  //   groups: ["RESIDENTIAL"],
+  // });
 
-  // Tried Puppeteer at first, but
-  // `stealth: true` is not working https://discord.com/channels/801163717915574323/801163920299393034/903107007148601346
-  // so I've tried `stealthOptions.hideWebDriver = true`, but also did not work
-  // so I've tried PlaywrightCrawler as recommended https://discord.com/channels/801163717915574323/801163920299393034/903114071086342185
-  const crawler = new Apify.PlaywrightCrawler({
+  const crawler = new Apify.BasicCrawler({
     maxRequestRetries: 5, //
     maxConcurrency: 1, // to make debugging easier
     requestList,
     requestQueue,
-    persistCookiesPerSession: false,
-    proxyConfiguration, // TODO: Enable on platform
-    launchContext: {
-      useChrome: true, // full Google Chrome rather than the bundled Chromium
-      // launcher: require("playwright").firefox,
-    },
-    navigationTimeoutSecs: 3 * 60,
-    preNavigationHooks: [
-      async (crawlingContext, gotoOptions) => {
-        await crawlingContext.browserController.setCookies(
-          crawlingContext.page,
-          [
-            {
-              name: "stockx_selected_currency",
-              value: "EUR",
-              domain: "stockx.com",
-              path: "/",
-            },
-          ]
-        );
-      },
-    ],
-    handlePageFunction: async (context) => {
-      const { request, response, page, session } = context;
+    // proxyConfiguration, // TODO: Enable on platform
+    handleRequestFunction: async (context) => {
+      const { request, session } = context;
       const {
         url,
-        userData: { type },
+        userData: { type, headers, body, method },
       } = request;
-      log.info("Page opened: ", { type, url });
 
-      // Handle blocking
-      switch (response.status()) {
+      const finalRequest = { url: request.url };
+      if (headers) {
+        finalRequest.headers = headers;
+      }
+      if (body) {
+        finalRequest.body = body;
+      }
+      if (method) {
+        finalRequest.method = method;
+      }
+
+      const response = await Apify.utils.requestAsBrowser(finalRequest);
+
+      switch (response.statusCode) {
         case 404:
           log.info("404 » skipping", { url });
           return;
-        case 403: // FIXME: This is already handled by the PlaywrightCrawler
+        case 403:
           log.info("403 (blocked) » retiring session and aborting", { url });
           session.retire();
           throw "403"; // Not throwing error, no need for call-stack
         case 200:
-          const captcha = await page.$("[class*='captcha']");
-          if (captcha) {
-            log.info(
-              "200 (ok), but captcha detected » retiring session and aborting",
-              { url }
-            );
-            throw "captcha"; // Not throwing error, no need for call-stack
-          } else {
-            log.info("200 (ok) » continuing", { url });
-          }
+          log.info("200 (ok) » continuing", { url });
           break;
         default:
           log.info("Unhandled status » retiring session and aborting", {
             url,
-            status: response.status(),
+            status: response.statusCode,
           });
           session.retire();
-          throw "Unhandled status"; // Not throwing error, no need for call-stack
+          throw (
+            "Unhandled status: " +
+            response.statusCode +
+            ": " +
+            String(response.body)
+          ); // Not throwing error, no need for call-stack
       }
 
       log.info("Handling request", { url, type: type || "no type" });
-      // Process
+
       switch (type) {
         case "LIST": // https://stockx.com/nike // TODO
-          return handleList(context);
+          return;
         case "CODE":
-          return handleCode(context, requestQueue, codesMapKVStore);
-        case "DETAIL": // https://stockx.com/nike-dunk-low-retro-white-black-2021
-          return handleDetail(context);
+          const { hits } = JSON.parse(response.body);
+          const mathing = hits.filter(({ style_id }) => {
+            return style_id === request.userData.code;
+          });
+          if (mathing.length >= 1) {
+            await requestQueue.addRequest({
+              url: makeDetailUrl(mathing[0].url),
+              userData: { type: "DETAIL", code: mathing[0].style_id },
+            });
+            await codesMapKVStore.setValue(mathing[0].style_id, mathing[0].url);
+          } else {
+            log.info(`Code ${request.userData.code} not found, skipping`);
+            log.info(
+              `available codes: ${hits
+                .map(({ style_id }) => style_id)
+                .join(", ")}`
+            );
+          }
+          return;
+        case "DETAIL":
+          await Apify.pushData({
+            "#success": true,
+            url: request.url,
+            data: JSON.parse(response.body),
+          });
+          return;
         default:
-          // https://stockx.com/ // TODO
-          return handleStart(context);
+          throw "Unhandled type: " + type;
       }
     },
   });
@@ -145,12 +166,6 @@ Apify.main(async () => {
   log.info("Crawl finished.");
 });
 
-async function handleStart({ request, page }) {
-  // TODO: Next iteration
+function makeDetailUrl(slug) {
+  return `https://stockx.com/api/products/${slug}?includes=market&currency=EUR&country=US`;
 }
-
-async function handleList({ request, page }) {
-  // TODO: Next iteration
-}
-
-
