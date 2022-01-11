@@ -40,7 +40,8 @@ Apify.main(async () => {
     } else {
       log.info(`Code ${code} not found in the store, adding`);
       const url =
-        "https://xw7sbct9v6-1.algolianet.com/1/indexes/products/query?x-algolia-agent=Algolia%20for%20vanilla%20JavaScript%203.32.1&x-algolia-application-id=XW7SBCT9V6&x-algolia-api-key=6b5e76b49705eb9f51a06d3c82f7acee&x-xcode="+ code;
+        "https://xw7sbct9v6-1.algolianet.com/1/indexes/products/query?x-algolia-agent=Algolia%20for%20vanilla%20JavaScript%203.32.1&x-algolia-application-id=XW7SBCT9V6&x-algolia-api-key=6b5e76b49705eb9f51a06d3c82f7acee&x-xcode=" +
+        code;
       const headers = {
         // 'user-agent': userAgent,
         "sec-fetch-dest": "none",
@@ -67,13 +68,13 @@ Apify.main(async () => {
     }
   }
 
-  // const proxyConfiguration = await Apify.createProxyConfiguration({
-  //   groups: ["RESIDENTIAL"],
-  // });
+  const proxyConfiguration = await Apify.createProxyConfiguration({
+    groups: ["RESIDENTIAL"],
+  });
 
   const crawler = new Apify.BasicCrawler({
-    maxRequestRetries: 5, //
-    maxConcurrency: 1, // to make debugging easier
+    maxRequestRetries: 3, //
+    maxConcurrency: 5, // or 1 to make debugging easier
     requestList,
     requestQueue,
     // proxyConfiguration, // TODO: Enable on platform
@@ -81,7 +82,7 @@ Apify.main(async () => {
       const { request, session } = context;
       const {
         url,
-        headers, 
+        headers,
         method,
         payload,
         userData: { type },
@@ -100,7 +101,10 @@ Apify.main(async () => {
         finalRequest.method = method;
       }
 
-      const response = await Apify.utils.requestAsBrowser(finalRequest);
+      const response = await Apify.utils.requestAsBrowser({
+        ...finalRequest,
+        proxyUrl: proxyConfiguration.newUrl(),
+      });
 
       switch (response.statusCode) {
         case 404:
@@ -154,14 +158,20 @@ Apify.main(async () => {
           }
           return;
         case "DETAIL":
-          const parsedData = JSON.parse(response.body)
-          const id = parsedData.Product.id
-          const sales = await Apify.utils.requestAsBrowser({url: `https://stockx.com/api/products/${id}/activity?limit=100&page=1&sort=createdAt&order=DESC&state=480&currency=EUR&country=CZ`});
-          
+          const parsedData = JSON.parse(response.body);
+          const id = parsedData.Product.id;
+          const sales = await Apify.utils.requestAsBrowser({
+            url: `https://stockx.com/api/products/${id}/activity?limit=100&page=1&sort=createdAt&order=DESC&state=480&currency=EUR&country=CZ`,
+            proxyUrl: proxyConfiguration.newUrl(),
+          });
+
           await Apify.pushData({
             "#success": true,
             url: request.url,
-            sales: sales.statusCode == 200 ? JSON.parse(sales.body) : String(sales.body),
+            sales:
+              sales.statusCode == 200
+                ? JSON.parse(sales.body)
+                : String(sales.body),
             data: parsedData,
           });
           return;
