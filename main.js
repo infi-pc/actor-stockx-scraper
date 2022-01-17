@@ -150,11 +150,18 @@ Apify.main(async () => {
             await codesMapKVStore.setValue(mathing[0].style_id, mathing[0].url);
           } else {
             log.error(`Code ${request.userData.code} not found, skipping`);
-            log.error(
-              `available codes: ${hits
-                .map(({ style_id }) => style_id)
-                .join(", ")}`
-            );
+
+            const availableCodes = hits
+              .map(({ style_id }) => style_id)
+              .join(", ");
+
+            log.error(`Available codes: ${availableCodes}`);
+            
+            await Apify.pushData({
+              "#success": true,
+              pid: request.userData.code,
+              error: `PID not found. Available codes: ${availableCodes}`,
+            });
           }
           return;
         case "DETAIL":
@@ -167,6 +174,7 @@ Apify.main(async () => {
 
           await Apify.pushData({
             "#success": true,
+            pid: parsedData.Product.styleId,
             url: request.url,
             sales:
               sales.statusCode == 200
