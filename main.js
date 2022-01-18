@@ -199,6 +199,13 @@ Apify.main(async () => {
               userData: { type: "DETAIL", code: shoe.styleId },
             });
           }
+          if (parsedAll.Pagination.nextPage) {
+            await requestQueue.addRequest({
+              url: `https://stockx.com${parsedAll.Pagination.nextPage}`,
+              userData: { type: "GET_ALL" },
+            });
+          }
+          return;
         default:
           throw "Unhandled type: " + type;
       }
