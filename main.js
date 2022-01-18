@@ -166,7 +166,7 @@ Apify.main(async () => {
             log.error(`Available codes: ${availableCodes}`);
 
             await Apify.pushData({
-              "#success": true,
+              "#missingCode": true,
               pid: request.userData.code,
               error: `PID not found. Available codes: ${availableCodes}`,
             });
@@ -199,12 +199,12 @@ Apify.main(async () => {
               userData: { type: "DETAIL", code: shoe.styleId },
             });
           }
-          if (parsedAll.Pagination.nextPage) {
-            await requestQueue.addRequest({
-              url: `https://stockx.com${parsedAll.Pagination.nextPage}`,
-              userData: { type: "GET_ALL" },
-            });
-          }
+          // if (parsedAll.Pagination.nextPage) {
+          //   await requestQueue.addRequest({
+          //     url: `https://stockx.com/api/browse?browseVerticals=sneakers&currency=EUR&${requestAll}&page=${page + 1}`,
+          //     userData: { type: "GET_ALL", page: page + 1 },
+          //   });
+          // }
           return;
         default:
           throw "Unhandled type: " + type;
