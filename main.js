@@ -6,9 +6,10 @@ const {
 } = Apify;
 
 Apify.main(async () => {
-  const { slugs = [], codes = [] } = (await Apify.getInput()) ?? {
-    slugs: ["air-jordan-max-aura-black"],
-    codes: ["AT8240-103", "VN0A4U39ZPM", "FW8978"],
+  const { slugs = [], codes = [], requestAll } = (await Apify.getInput()) ?? {
+    slugs: [], // ["air-jordan-max-aura-black"],
+    codes: [], // ["AT8240-103", "VN0A4U39ZPM", "FW8978"],
+    requestAll: "year=2021&market.lowestAsk=gte-600" // ""
   };
 
   console.log(`slugs: ${slugs}`);
@@ -24,6 +25,13 @@ Apify.main(async () => {
   const codesMapKVStore = await Apify.openKeyValueStore(
     "STOCKX-CODES-TO-SLUG-MAP"
   );
+
+  if (requestAll) {
+    await requestQueue.addRequest({
+      url: `https://stockx.com/api/browse?browseVerticals=sneakers&currency=EUR&${requestAll}`,
+      userData: { type: "GET_ALL" },
+    });
+  }
 
   // load cachedUrl LUT code -> url
   for (const code of codes) {
@@ -156,7 +164,7 @@ Apify.main(async () => {
               .join(", ");
 
             log.error(`Available codes: ${availableCodes}`);
-            
+
             await Apify.pushData({
               "#success": true,
               pid: request.userData.code,
@@ -165,8 +173,8 @@ Apify.main(async () => {
           }
           return;
         case "DETAIL":
-          const parsedData = JSON.parse(response.body);
-          const id = parsedData.Product.id;
+          const parsedDetail = JSON.parse(response.body);
+          const id = parsedDetail.Product.id;
           const sales = await Apify.utils.requestAsBrowser({
             url: `https://stockx.com/api/products/${id}/activity?limit=100&page=1&sort=createdAt&order=DESC&state=480&currency=EUR&country=CZ`,
             proxyUrl: proxyConfiguration.newUrl(),
@@ -174,15 +182,23 @@ Apify.main(async () => {
 
           await Apify.pushData({
             "#success": true,
-            pid: parsedData.Product.styleId,
+            pid: parsedDetail.Product.styleId,
             url: request.url,
             sales:
               sales.statusCode == 200
                 ? JSON.parse(sales.body)
                 : String(sales.body),
-            data: parsedData,
+            data: parsedDetail,
           });
           return;
+        case "GET_ALL": 
+          const parsedAll = JSON.parse(response.body);
+          for (const shoe of parsedAll.Products) {
+            await requestQueue.addRequest({
+              url: makeDetailUrl(shoe.urlKey),
+              userData: { type: "DETAIL", code: shoe.styleId },
+            });
+          }
         default:
           throw "Unhandled type: " + type;
       }
@@ -195,5 +211,5 @@ Apify.main(async () => {
 });
 
 function makeDetailUrl(slug) {
-  return `https://stockx.com/api/products/${slug}?includes=market&currency=EUR&country=US`;
+  return `https://stockx.com/api/products/${slug}?includes=market&currency=EUR&country=CZ`;
 }

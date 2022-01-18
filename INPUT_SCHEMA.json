@@ -21,6 +21,13 @@
       "prefill": [
         "CW3879-100"
       ]
+    },
+    "requestAll": {
+      "title": "params for get all",
+      "type": "string",
+      "description": "params for get all",
+      "editor": "textfield",
+      "prefill": ""
     }
   },
   "required": []
