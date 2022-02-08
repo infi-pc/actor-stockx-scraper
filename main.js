@@ -9,10 +9,14 @@ console.log("Starting module");
 
 Apify.main(async () => {
   console.log("Starting main");
-  const { slugs = [], codes = [], requestAll } = (await Apify.getInput()) ?? {
+  const {
+    slugs = [],
+    codes = [],
+    requestAll,
+  } = (await Apify.getInput()) ?? {
     slugs: [], // ["air-jordan-max-aura-black"],
     codes: [], // ["AT8240-103", "VN0A4U39ZPM", "FW8978"],
-    requestAll: "year=2021&market.lowestAsk=gte-600" // ""
+    requestAll: "year=2021&market.lowestAsk=gte-600", // ""
   };
 
   console.log(`slugs: ${slugs}`);
@@ -37,12 +41,15 @@ Apify.main(async () => {
 
   if (requestAll) {
     console.log("Adding request all");
-    await requestQueue.addRequest({
-      url: `https://stockx.com/api/browse?browseVerticals=sneakers&currency=EUR&${requestAll}`,
-      userData: { type: "GET_ALL" },
-    }, {
-      forefront: true,
-    });
+    await requestQueue.addRequest(
+      {
+        url: `https://stockx.com/api/browse?browseVerticals=sneakers&currency=EUR&${requestAll}`,
+        userData: { type: "GET_ALL" },
+      },
+      {
+        forefront: true,
+      }
+    );
   }
 
   console.log("Adding codes");
@@ -196,18 +203,22 @@ Apify.main(async () => {
             proxyUrl: proxyConfiguration.newUrl(),
           });
 
+          const salesData =
+            sales.statusCode == 200 ? JSON.parse(sales.body) : undefined;
+
+          if (!salesData) {
+            log.error("Error sales data: " + String(sales.body));
+          }
+          
           await Apify.pushData({
             "#success": true,
             pid: parsedDetail.Product.styleId,
             url: request.url,
-            sales:
-              sales.statusCode == 200
-                ? JSON.parse(sales.body)
-                : String(sales.body),
+            sales: salesData,
             data: parsedDetail,
           });
           return;
-        case "GET_ALL": 
+        case "GET_ALL":
           const parsedAll = JSON.parse(response.body);
           for (const shoe of parsedAll.Products) {
             await requestQueue.addRequest({
