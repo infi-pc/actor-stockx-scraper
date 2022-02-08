@@ -5,7 +5,10 @@ const {
   utils: { log },
 } = Apify;
 
+console.log("Starting module");
+
 Apify.main(async () => {
+  console.log("Starting main");
   const { slugs = [], codes = [], requestAll } = (await Apify.getInput()) ?? {
     slugs: [], // ["air-jordan-max-aura-black"],
     codes: [], // ["AT8240-103", "VN0A4U39ZPM", "FW8978"],
@@ -13,7 +16,10 @@ Apify.main(async () => {
   };
 
   console.log(`slugs: ${slugs}`);
+  console.log(`codes: ${codes}`);
+  console.log(`requestAll: ${requestAll}`);
 
+  console.log("Opening request list");
   const requestList = await Apify.openRequestList(
     "slugs",
     slugs.map((slug) => {
@@ -21,18 +27,25 @@ Apify.main(async () => {
     })
   );
 
+  console.log("Opening request queue");
   const requestQueue = await Apify.openRequestQueue();
+
+  console.log("Opening KV Store");
   const codesMapKVStore = await Apify.openKeyValueStore(
     "STOCKX-CODES-TO-SLUG-MAP"
   );
 
   if (requestAll) {
+    console.log("Adding request all");
     await requestQueue.addRequest({
       url: `https://stockx.com/api/browse?browseVerticals=sneakers&currency=EUR&${requestAll}`,
       userData: { type: "GET_ALL" },
+    }, {
+      forefront: true,
     });
   }
 
+  console.log("Adding codes");
   // load cachedUrl LUT code -> url
   for (const code of codes) {
     const cachedSlug = await codesMapKVStore.getValue(code);
@@ -76,15 +89,18 @@ Apify.main(async () => {
     }
   }
 
+  console.log("Setup proxy");
   const proxyConfiguration = await Apify.createProxyConfiguration({
     groups: ["RESIDENTIAL"],
   });
 
+  console.log("Starting crawler");
   const crawler = new Apify.BasicCrawler({
     maxRequestRetries: 3, //
     maxConcurrency: 5, // or 1 to make debugging easier
     requestList,
     requestQueue,
+
     // proxyConfiguration, // TODO: Enable on platform
     handleRequestFunction: async (context) => {
       const { request, session } = context;
