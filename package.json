@@ -4,7 +4,7 @@
     "description": "StockX scraper",
     "dependencies": {
         "apify": "^2.2.1",
-        "playwright": "^1.17.1",
+        "playwright": "^1.18.0",
         "puppeteer": "13.0.1"
     },
     "scripts": {
