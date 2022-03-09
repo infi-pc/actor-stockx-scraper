@@ -3,7 +3,7 @@
     "version": "0.0.1",
     "description": "StockX scraper",
     "dependencies": {
-        "apify": "^2.2.1",
+        "apify": "^2.2.2",
         "playwright": "^1.17.1",
         "puppeteer": "13.0.1"
     },
